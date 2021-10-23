@@ -1,4 +1,5 @@
 import socket
+import hashlib
 
 import os
 import sys
@@ -30,13 +31,26 @@ def connetToSuperNode():
     s.connect((local_ip, int(port)))
     print("connectado a " + local_ip + ":" + port)
 
+def verifySHA(file_path):
+    h = hashlib.sha256()
+
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(h.block_size)
+            if not chunk:
+                break
+            h.update(chunk)
+
+    return h.hexdigest()
 
 def main():
-    type = sys.argv[1]
-    if type == "SUPER":
-        generateSocket(sys.argv[2])
+    # type = sys.argv[1]
+    # if type == "SUPER":
+    #     generateSocket(sys.argv[2])
 
-    connetToSuperNode()
+    # connetToSuperNode()
+
+   print(verifySHA('testfile.txt'))
 
 
 if __name__=="__main__":

@@ -4,6 +4,8 @@ import threading
 import socket
 import sys
 import time
+import hashlib
+
 
 class MyException(Exception):
     pass
@@ -40,12 +42,13 @@ class Node:
         action_dict = {
             '1': self.list,
             '2': self.find,
+            '3': self.add_file,
             '5': self.exit,
             }
         while True:
             try:
                 req = input(
-                    '\n1: Listar todos, 2: Buscar, 5: Finalizar\nEscolha sua ação: ')
+                    '\n1: Listar todos, 2: Buscar, 3: Incluir arquivo, 5: Finalizar\nEscolha sua ação: ')
                 action_dict.setdefault(req, self.invalid_action)()
             except MyException as e:
                 print(e)
@@ -63,13 +66,34 @@ class Node:
     def find(self):
         print("Buscar arquivo...")
         filename = input("\nDigite o nome do arquivo:")
-        print(filename)
         l1 = "find\n"
         l2 = "host:nodeip\n"
         l3 = "port:1010\n"
-        l4 = "filename:{filename}".format(filename=filename)
+        l4 = "{filename}".format(filename=filename)
         msg = l1 + l2 + l3 + l4
         self.server.sendall(msg.encode())
+        received = self.server.recv(1024).decode()
+        
+
+    def add_file(self):
+        print("Incluir arquivo...")
+        filename = input("\nDigite o nome do arquivo: ")
+        with open(filename, "rb") as file:
+            h = hashlib.sha256()
+            while True:
+                chunk = file.read(h.block_size)
+                if not chunk:
+                    break
+                h.update(chunk)
+            l1 = "add_file\n"
+            l2 = f"{h.hexdigest()}\n"
+            l3 = f"{filename}\n"
+            l4 = "host:{host}\n".format(host=self.server.getsockname()[0])
+            l5 = "port:{port}\n".format(port=self.server.getsockname()[1])
+
+            msg = l1 + l2 + l3 + l4 + l5
+            self.server.sendall(msg.encode())
+
 
     def keep_alive(self, server):
         while True:
