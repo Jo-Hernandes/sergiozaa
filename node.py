@@ -73,6 +73,7 @@ class Node:
         msg = l1 + l2 + l3 + l4
         self.server.sendall(msg.encode())
         received = self.server.recv(1024).decode()
+        print(received)
         
 
     def add_file(self):

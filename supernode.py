@@ -2,34 +2,20 @@
 import socket
 import threading
 import sys
-from kademlia.network import Server
-import asyncio
-
 
 class MyException(Exception):
     pass
 
 class SuperNode():
     
-    def __init__(self, HOST='localhost', PORT=7735):
+    def __init__(self, HOST='localhost', PORT=7736):
         self.HOST = HOST
         self.PORT = PORT
-        
-        self.node = Server()
+
         self.peers = []
+        self.files = dict({})
         self.lock = threading.Lock()
 
-    async def initHashNode(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.node.listen(8468))
-
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            self.node.stop()
-            loop.close()
 
     # start listenning
     def start(self):
@@ -37,7 +23,6 @@ class SuperNode():
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.bind((self.HOST, self.PORT))
             self.s.listen(5)
-            asyncio.run(self.initHashNode())
 
             print("Supernode up on {0} is listening on port {1}".format(*[self.HOST, self.PORT]))
 
@@ -63,6 +48,7 @@ class SuperNode():
             action_dict = {
                 'list': self.list,
                 'find': self.find,
+                'look_up': self.look_up,
                 'add_file': self.add_file,
                 'keep-alive': self.keep_alive
                 }
@@ -75,32 +61,47 @@ class SuperNode():
         except:
             socs.sendall(str.encode("resposta do list"))
 
+    def look_up(self, key):
+        return ""
 
-    async def search_file(self, key, socs):
-        value = await self.node.get(key)
-        print(value)
-        if (value is None):
-            socs.sendall(str.encode("Arquivo nao encontrado"))
-        else: 
-            socs.sendall(str.encode(value))
+    def search_nodes(self, key):
+        l1 = "look_up \n"
+        l2 = f'{key} \n'
+        for server in self.peers:
+            server.sendall(str.encode(l1 + l2))
+            received = server.recv(1024).decode()
+            if received != "":
+                return received
+        return ""
+
 
     def find(self, socs, req):
         lines = req.splitlines()
-        asyncio.run(self.search_file(lines[3], socs))
+        key = lines[3]
+        if key in self.files:
+            retrieved_item = self.files[lines[3]]
+            socs.sendall(str.encode(retrieved_item))
+        else:
+            retrieved_item = self.search_nodes(key)
+            if (retrieved_item == ""):
+                socs.sendall(str.encode("item nao encontrado"))
+            else:
+                socs.sendall(str.encode(retrieved_item))
+
 
     def keep_alive(self, socs, req):
         print("client is alive!")
 
-    async def include_file(self, key, value):
-        await self.node.set(key, value)
-
     def add_file(self, socs, req):
         lines = req.splitlines()
-        asyncio.run(self.include_file(lines[1], lines[2]+lines[3]+lines[4]))
-        
+        self.files[lines[1]] = f'\n{lines[1]} - {lines[2]} - {lines[3]} - {lines[4]}'
+        print(self.files[lines[1]])
+
     def invalid_action(self):
-        raise MyException('\nAção invalida.')
+        raise MyException('Ação invalida.')
 
 if __name__ == '__main__':
     SuperNode().start()
+# %%
+
 # %%
