@@ -6,7 +6,6 @@ import sys
 import time
 import hashlib
 import os
-from sendfile import send, receive
 
 class MyException(Exception):
     pass
@@ -14,7 +13,7 @@ class MyException(Exception):
 class Node:
     
     
-    def __init__(self, host, port, super_node_ip, super_node_port, folder="/"):
+    def __init__(self, host, port, super_node_ip, super_node_port, folder):
         self.host = host
         self.port = port
         self.supernode_host = super_node_ip
@@ -50,13 +49,15 @@ class Node:
     def handle_request(self, socs):
         while True:
             client_socket, address = socs.accept()
-            req = client_socket.recv(1024).decode()
+            req = client_socket.recv(self.BUFFER_SIZE).decode()
             if req != "":
-                print('Recieve request:{req}'.format(req=req))
                 lines = req.splitlines()
+                # print("lines = {lines}".format(lines=lines))
                 action = lines[0]
+                print("Received request {action}".format(action=action))
                 action_dict = {
                     'send_file': self.send_file_to_peer,
+                    'recv_file': self.receive_file_from_peer,
                     }
                 action_dict.setdefault(action, self.invalid_action)(client_socket, address, req)
                 
@@ -125,16 +126,22 @@ class Node:
         lines = req.splitlines()
         host = lines[1].split(":")[1]
         port = lines[2].split(":")[1]
-        filename = lines[3]
+        serverhost = lines[3].split(":")[1]
+        serverport = lines[4].split(":")[1]
+        filename = lines[5]
         filesize = os.path.getsize(filename)
         
         s = socket.socket()
-        print(f"[+] Connecting to {host}:{port}")
-        s.connect((host, int(port)))
+        print(f"[+] Connecting to {serverhost}:{serverport}")
+        s.connect((serverhost, int(serverport)))
         print("[+] Connected.")
-        s.send(f"{filename}{self.SEPARATOR}{filesize}".encode())
+        
+        msg = "recv_file\n{filename}{SEPARATOR}{filesize}\n".format(filename=filename, SEPARATOR=self.SEPARATOR, filesize=filesize)
+        s.send(msg.encode())
 
-        with open(filename, "rb") as f:
+        path_file = os.path.join(self.folder, filename)
+        
+        with open(path_file, "rb") as f:
             while True:
                 bytes_read = f.read(self.BUFFER_SIZE)
                 if not bytes_read:
@@ -142,6 +149,24 @@ class Node:
                 s.sendall(bytes_read)
         print("[+] DONE!")
         
+    def receive_file_from_peer(self, socs, filenamesize, req):
+        print("Baixando arquivo...")
+        
+        lines = req.splitlines()
+        filename_size = lines[1]
+        filename, filesize = filename_size.split(self.SEPARATOR)
+        path_file = os.path.join(self.folder, filename)
+        filesize = int(filesize)
+
+        print("Saving file at {path_file}".format(path_file=path_file))
+        with open(path_file, "wb+") as f:
+            while True:
+                bytes_read = socs.recv(self.BUFFER_SIZE)
+                if not bytes_read:    
+                    break
+                f.write(bytes_read)
+            f.close()
+        print("[+] DONE!")
     
     def get_file(self):
         print("Baixar arquivo...")
@@ -152,10 +177,12 @@ class Node:
         l1 = "send_file\n"
         l2 = "host:{host}\n".format(host=peer_host)
         l3 = "port:{port}\n".format(port=peer_port)
-        l4 = "{filename}".format(filename=filename)
-        msg = l1 + l2 + l3 + l4
-        s = socket.socket()
+        l4 = "serverhost:{port}\n".format(port=self.host)
+        l5 = "serverport:{port}\n".format(port=self.port)
+        l6 = "{filename}".format(filename=filename)
+        msg = l1 + l2 + l3 + l4 + l5 + l6
         print(f"[+] Connecting to {peer_host}:{peer_port}")
+        s = socket.socket()
         s.connect((peer_host, int(peer_port)))
         s.sendall(msg.encode())
         
@@ -196,3 +223,4 @@ if __name__=="__main__":
                 folder=args.folder)
     
     node.start()
+# %%

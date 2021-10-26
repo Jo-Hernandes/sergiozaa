@@ -56,9 +56,9 @@ class SuperNode():
                 handle_peers_thread = threading.Thread(target=self.handle_request, args=(socs, addr))
                 handle_peers_thread.start()
 
-                # # start timer to verify peers alive
-                # thread_verify_peers_alive = threading.Thread(target=self.verify_peers_alive)
-                # thread_verify_peers_alive.start()
+                # start timer to verify peers alive
+                thread_verify_peers_alive = threading.Thread(target=self.verify_peers_alive)
+                thread_verify_peers_alive.start()
 
                 # # start timer to force peers live probe
                 # thread_force_peers_live_probe = threading.Thread(target=self.force_peers_live_probe)
@@ -158,7 +158,7 @@ class SuperNode():
             self.lock.acquire()
             for peer in self.peers:
                 if peer['isAlive'] == False:
-                    self.peers.remove(peer)
+                    # self.peers.remove(peer)
                     print('{}:{} is dead'.format(peer['host'], peer['port']))
             self.lock.release()
 
